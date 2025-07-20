@@ -6,7 +6,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.29.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
 func InitTracer(serviceName string, jagerEndpoint string) (*trace.TracerProvider, error) {

@@ -6,12 +6,12 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/prometheus"
-	"go.opentelemetry.io/otel/metrics"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.29.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
 )
 
-func InitMetrics(serviceName string) (metrics.MeterProvider, error) {
+func InitMetrics(serviceName string) (metric.MeterProvider, error) {
 	exporter, err := prometheus.New(prometheus.WithoutUnits())
 	if err != nil {
 		return nil, err
@@ -28,9 +28,9 @@ func InitMetrics(serviceName string) (metrics.MeterProvider, error) {
 		return nil, err
 	}
 
-	meterProvider := metrics.NewMeterProvider(
-		metrics.WithReader(exporter),
-		metrics.WithResource(res),
+	meterProvider := metric.NewMeterProvider(
+		metric.WithReader(exporter),
+		metric.WithResource(res),
 	)
 
 	otel.SetMeterProvider(meterProvider)

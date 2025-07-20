@@ -4,9 +4,9 @@ import (
     "log"
     "net/http"
     "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-    "github.com/janeliul/otel-go-demo/common"
+    "github.com/JaneLiuL/otel-go-demo/common"
     "go.opentelemetry.io/otel/sdk/resource"
-    semconv "go.opentelemetry.io/otel/semconv/v1.29.0"
+    semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
     "context"
 )
 func main() {
