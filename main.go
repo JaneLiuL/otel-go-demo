@@ -1,51 +1,57 @@
 package main
 
 import (
-    "log"
-    "net/http"
-    "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
-    "github.com/JaneLiuL/otel-go-demo/common"
-    "go.opentelemetry.io/otel/sdk/resource"
-    semconv "go.opentelemetry.io/otel/semconv/v1.17.0"
-    "context"
+	"context"
+	"errors"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 )
+
 func main() {
-    tp, err := common.InitTracer("otel-go-demo", "http://localhost:14268/api/traces")
-    if err != nil {
-        log.Fatalf("failed to initialize tracer: %v", err)
-    }
-    defer tp.Shutdown(context.Background())
+	if err := run(); err != nil {
+		log.Fatalf("Failed to run the application: %v", err)
+	}
+}
 
+func run() (err error) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	// Initialize OpenTelemetry SDK
+	otelShutdown, err := setupOtelsdk(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = errors.Join(err, otelShutdown(context.Background()))
+	}()
+	// Start HTTP server
+	srv := &http.Server{
+		Addr:         ":8080",
+		Handler:      http.HandlerFunc(rolldice),
+		BaseContext:  func(l net.Listener) context.Context { return ctx },
+		WriteTimeout: 10 * time.Second,
+		ReadTimeout:  time.Second,
+	}
+	srvErr := make(chan error, 1)
+	go func() {
+		srvErr <- srv.ListenAndServe()
+	}()
+	select {
+	case err = <-srvErr:
+		// Error when starting HTTP server.
+		return
+	case <-ctx.Done():
+		// Wait for first CTRL+C.
+		// Stop receiving signal notifications as soon as possible.
+		stop()
+	}
 
-    mp, err := common.InitMetrics("otel-go-demo")
-    if err != nil {
-        log.Fatalf("failed to initialize metrics: %v", err)
-    }
-    defer mp.Shutdown(context.Background())
-    log.Println("OpenTelemetry initialized successfully")
-    meter := mp.Meter("otel-go-demo")
-    counter, err := meter.Int64Counter("requests_total",
-        common.WithDescription("Total number of requests received"),
-    )
-    if err != nil {
-        log.Fatalf("failed to create counter: %v", err)
-    }
-    counter.Add(context.Background(), 1, resource.WithAttributes(
-        semconv.ServiceNameKey.String("otel-go-demo"),
-        semconv.ServiceVersionKey.String("1.0.0"),
-        semconv.DeploymentEnvironmentKey.String("production"),
-    ))
-
-    mux := http.NewServeMux()
-    mux.Handle("/", otelhttp.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        w.Write([]byte("Hello, OpenTelemetry!"))
-    }), "HelloHandler"))
-    server := &http.Server{
-        Addr:    ":8080",
-        Handler: otelhttp.NewHandler(mux, "HTTPServer"), 
-    }
-    log.Println("Starting server on :8080")
-    if err := server.ListenAndServe(); err != nil {
-        log.Fatalf("failed to start server: %v", err)
-    }
+	// When Shutdown is called, ListenAndServe immediately returns ErrServerClosed.
+	err = srv.Shutdown(context.Background())
+	return
 }
